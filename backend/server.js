@@ -9,7 +9,10 @@ const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'slow-mind-secret-key';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://antodev00.github.io'],
+  credentials: true
+}));
 app.use(express.json());
 
 // In-memory database for simplicity
