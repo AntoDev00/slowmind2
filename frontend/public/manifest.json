@@ -1,0 +1,16 @@
+{
+  "short_name": "Slow Mind",
+  "name": "Slow Mind Meditation App",
+  "icons": [
+    {
+      "src": "meditation-favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#FCF4E7",
+  "background_color": "#FCF4E7"
+}

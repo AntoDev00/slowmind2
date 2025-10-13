@@ -1,0 +1,17 @@
+{
+  "name": "slow-mind-app",
+  "version": "1.0.0",
+  "description": "Slow Mind - Meditation Application",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
