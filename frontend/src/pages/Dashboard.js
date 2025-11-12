@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import axios from 'axios';
 import styled from 'styled-components';
 import ProfileSection from '../components/ProfileSection';
 import MessageBoard from '../components/MessageBoard';
 import NotificationsPanel from '../components/NotificationsPanel';
 import QuoteService from '../services/QuoteService';
+import apiClient from '../services/apiClient';
 
 const DashboardContainer = styled.div`
   padding: 2rem;
@@ -157,21 +157,26 @@ const Dashboard = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(3); // Mock number of unread notifications
 
   useEffect(() => {
+    if (!currentUser) {
+      setQuoteOfDay(null);
+      setSessions([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch daily quote using the QuoteService
         const dailyQuote = await QuoteService.getQuoteOfTheDay();
         setQuoteOfDay(dailyQuote);
-        
-        // Fetch meditation sessions if API is ready
+
         try {
-          const sessionsResponse = await axios.get('http://localhost:5000/api/meditations');
-          setSessions(sessionsResponse.data);
+          const { data } = await apiClient.get('/api/meditations');
+          setSessions(data);
         } catch (sessionError) {
           console.error('Error fetching meditation sessions:', sessionError);
+          setError('Unable to load your meditation sessions right now.');
         }
-        
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Failed to load your dashboard data. Please try again later.');
@@ -181,7 +186,7 @@ const Dashboard = () => {
     };
 
     fetchData();
-  }, []);
+  }, [currentUser]);
 
   // Calculated stats
   const totalSessions = sessions.length;

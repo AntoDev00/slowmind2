@@ -1,5 +1,5 @@
 // Service for managing motivational quotes and daily rotation
-import axios from 'axios';
+import apiClient from './apiClient';
 
 const QuoteService = {
   // Collection of motivational quotes
@@ -26,7 +26,7 @@ const QuoteService = {
     try {
       // First, check if we should fetch from the backend
       try {
-        const response = await axios.get('http://localhost:5000/api/quotes/daily');
+        const response = await apiClient.get('/api/quotes/daily');
         if (response.data && response.data.text) {
           return response.data;
         }
@@ -81,7 +81,7 @@ const QuoteService = {
   getAllQuotes: async () => {
     try {
       // Try to get quotes from backend first
-      const response = await axios.get('http://localhost:5000/api/quotes');
+      const response = await apiClient.get('/api/quotes');
       if (response.data && response.data.length > 0) {
         return response.data;
       }

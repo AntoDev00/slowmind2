@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import axios from 'axios';
 import styled from 'styled-components';
 import CongratulationsModal from '../components/CongratulationsModal';
+import apiClient from '../services/apiClient';
 
 const MeditateContainer = styled.div`
   padding: 2rem;
@@ -223,16 +223,8 @@ const Meditate = () => {
     // Fetch a random quote when component mounts
     const fetchQuote = async () => {
       try {
-        // Get token from localStorage
-        const token = localStorage.getItem('token');
-        
-        // Make request with authorization header
-        const response = await axios.get('http://localhost:5000/api/quotes', {
-          headers: {
-            'x-auth-token': token
-          }
-        });
-        
+        const response = await apiClient.get('/api/quotes');
+
         if (response.data.length > 0) {
           const randomIndex = Math.floor(Math.random() * response.data.length);
           setQuote(response.data[randomIndex]);
@@ -303,10 +295,10 @@ const Meditate = () => {
 
   const handleComplete = async () => {
     try {
-      await axios.post('http://localhost:5000/api/meditations', {
-        duration: (duration - timeRemaining) / 60, // Convert to minutes
+      await apiClient.post('/api/meditations', {
+        duration: Number(((duration - timeRemaining) / 60).toFixed(2)),
         type: meditationType,
-        notes: notes
+        notes: notes || undefined
       });
       
       // Don't reset immediately - this will be handled after modal interactions

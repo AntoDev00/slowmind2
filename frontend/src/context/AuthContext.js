@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../services/apiClient';
 
 export const AuthContext = createContext();
 
@@ -9,47 +9,44 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // If we have a token, try to get user data
-    if (token) {
-      axios.defaults.headers.common['x-auth-token'] = token;
-      
-      // Verifica se abbiamo già dati utente nel localStorage
+    const initializeAuth = async () => {
+      if (!token) {
+        setCurrentUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+
       const savedUser = localStorage.getItem('userData');
       if (savedUser) {
         try {
-          // Utilizza i dati utente salvati direttamente
           setCurrentUser(JSON.parse(savedUser));
-          return; // Usiamo i dati salvati, non decodifichiamo il token
         } catch (error) {
           console.error('Error parsing saved user data', error);
-          // Continua con il metodo di fallback se c'è un errore
+          localStorage.removeItem('userData');
         }
       }
-      
-      // Fallback: decodifica il token JWT
+
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const userData = {
-          id: payload.id,
-          email: payload.email,
-          username: payload.username || payload.email.split('@')[0]
-        };
-        setCurrentUser(userData);
-        
-        // Salva i dati utente per uso futuro
-        localStorage.setItem('userData', JSON.stringify(userData));
+        const response = await apiClient.get('/api/users/me');
+        setCurrentUser(response.data);
+        localStorage.setItem('userData', JSON.stringify(response.data));
       } catch (error) {
-        console.error('Error parsing token', error);
+        console.error('Error fetching user profile', error);
         logout();
+      } finally {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
+    };
+
+    initializeAuth();
   }, [token]);
 
   // Register user
   const register = async (userData) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/register', userData);
+      const res = await apiClient.post('/api/register', userData);
       setToken(res.data.token);
       setCurrentUser(res.data.user);
       localStorage.setItem('token', res.data.token);
@@ -64,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   // Login user
   const login = async (userData) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/login', userData);
+      const res = await apiClient.post('/api/login', userData);
       setToken(res.data.token);
       setCurrentUser(res.data.user);
       localStorage.setItem('token', res.data.token);
@@ -82,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('userData'); // Rimuovi anche i dati utente salvati
-    delete axios.defaults.headers.common['x-auth-token'];
+    delete apiClient.defaults.headers.common['x-auth-token'];
   };
 
   return (
@@ -92,7 +89,8 @@ export const AuthProvider = ({ children }) => {
         isLoading,
         register,
         login,
-        logout
+        logout,
+        setCurrentUser
       }}
     >
       {children}

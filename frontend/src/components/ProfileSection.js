@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import axios from 'axios';
 import styled from 'styled-components';
+import apiClient from '../services/apiClient';
 
 const ProfileContainer = styled.div`
   background-color: white;
@@ -162,11 +162,15 @@ const ProfileSection = () => {
     setError('');
 
     try {
-      const response = await axios.put(`http://localhost:5000/api/users/${currentUser.id}`, profileData);
-      setCurrentUser({
-        ...currentUser,
-        ...response.data
-      });
+      const payload = {
+        username: profileData.username,
+        bio: profileData.bio,
+        preferences: profileData.preferences
+      };
+
+      const response = await apiClient.put(`/api/users/${currentUser.id}`, payload);
+      setCurrentUser(response.data);
+      localStorage.setItem('userData', JSON.stringify(response.data));
       setSuccess('Profile updated successfully!');
     } catch (err) {
       console.error('Error updating profile:', err);

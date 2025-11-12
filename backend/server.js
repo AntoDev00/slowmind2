@@ -2,67 +2,82 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const path = require('path');
 require('dotenv').config();
 
+const { PORT, JWT_SECRET, ALLOWED_ORIGINS } = require('./config');
+const {
+  getUserByEmailWithPassword,
+  getUserById,
+  createUser,
+  updateUser,
+  createMeditationSession,
+  getMeditationSessionsByUser,
+  deleteMeditationSession,
+  getQuotes,
+  getQuoteOfTheDay,
+  createCommunityPost,
+  listCommunityPosts,
+  addLikeToPost,
+  createCommunityComment,
+  getCommentsForPost
+} = require('./db');
+
 const app = express();
-const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || 'slow-mind-secret-key';
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://antodev00.github.io'],
+  origin: ALLOWED_ORIGINS,
   credentials: true
 }));
 app.use(express.json());
 
-// In-memory database for simplicity
-// In a real app, you would use a proper database like MongoDB or PostgreSQL
-const users = [];
-const meditationSessions = [];
-const motivationalQuotes = [
-  { id: 1, text: "Breathe in peace, breathe out tension." },
-  { id: 2, text: "The present moment is the only moment available to us." },
-  { id: 3, text: "Peace comes from within. Do not seek it without." },
-  { id: 4, text: "Quiet the mind, and the soul will speak." },
-  { id: 5, text: "Meditation is the soul's perspective glass." }
-];
+// Authentication middleware
+const authenticate = (req, res, next) => {
+  const token = req.header('x-auth-token');
 
-// Authentication routes
+  if (!token) {
+    return res.status(401).json({ message: 'No token, authorization denied' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Token is not valid' });
+  }
+};
+
+// Routes
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    
-    // Check if user already exists
-    if (users.find(user => user.email === email)) {
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'Username, email, and password are required' });
+    }
+
+    const existingUser = await getUserByEmailWithPassword(email);
+    if (existingUser?.user) {
       return res.status(400).json({ message: 'User already exists' });
     }
-    
-    // Hash password
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    
-    // Create new user
-    const newUser = {
-      id: users.length + 1,
-      username,
-      email,
-      password: hashedPassword,
-      createdAt: new Date()
-    };
-    
-    users.push(newUser);
-    
-    // Generate token
+
+    const newUser = await createUser(username, email, hashedPassword);
+
     const token = jwt.sign(
       { id: newUser.id, email: newUser.email, username: newUser.username },
       JWT_SECRET,
       { expiresIn: '2h' }
     );
-    
-    res.status(201).json({ 
-      message: 'User registered successfully', 
+
+    res.status(201).json({
+      message: 'User registered successfully',
       token,
-      user: { id: newUser.id, username: newUser.username, email: newUser.email }
+      user: newUser
     });
   } catch (error) {
     console.error(error);
@@ -73,32 +88,27 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
-    // Find user
-    const user = users.find(user => user.email === email);
-    
-    if (!user) {
+
+    const userRecord = await getUserByEmailWithPassword(email);
+    if (!userRecord?.user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    
+
+    const isMatch = await bcrypt.compare(password, userRecord.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    
-    // Generate token
+
     const token = jwt.sign(
-      { id: user.id, email: user.email, username: user.username },
+      { id: userRecord.user.id, email: userRecord.user.email, username: userRecord.user.username },
       JWT_SECRET,
       { expiresIn: '2h' }
     );
-    
-    res.json({ 
-      message: 'Login successful', 
+
+    res.json({
+      message: 'Login successful',
       token,
-      user: { id: user.id, username: user.username, email: user.email }
+      user: userRecord.user
     });
   } catch (error) {
     console.error(error);
@@ -106,56 +116,182 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Authentication middleware
-const authenticate = (req, res, next) => {
-  const token = req.header('x-auth-token');
-  
-  if (!token) {
-    return res.status(401).json({ message: 'No token, authorization denied' });
-  }
-  
+app.get('/api/users/me', authenticate, async (req, res) => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    res.status(401).json({ message: 'Token is not valid' });
-  }
-};
-
-// Protected routes
-app.get('/api/quotes', authenticate, (req, res) => {
-  res.json(motivationalQuotes);
-});
-
-// Add a new meditation session
-app.post('/api/meditations', authenticate, (req, res) => {
-  try {
-    const { duration, type, notes } = req.body;
-    
-    const newSession = {
-      id: meditationSessions.length + 1,
-      userId: req.user.id,
-      duration,
-      type,
-      notes,
-      date: new Date()
-    };
-    
-    meditationSessions.push(newSession);
-    
-    res.status(201).json({ message: 'Meditation session recorded', session: newSession });
+    const user = await getUserById(req.user.id);
+    res.json(user);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get user's meditation sessions
-app.get('/api/meditations', authenticate, (req, res) => {
-  const userSessions = meditationSessions.filter(session => session.userId === req.user.id);
-  res.json(userSessions);
+app.put('/api/users/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (Number(id) !== req.user.id) {
+      return res.status(403).json({ message: 'You can only update your own profile' });
+    }
+
+    const { username, bio, preferences } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ message: 'Username is required' });
+    }
+
+    await updateUser(req.user.id, { username, bio, preferences });
+    const updatedUser = await getUserById(req.user.id);
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
+
+app.get('/api/quotes', authenticate, async (req, res) => {
+  try {
+    const quotes = await getQuotes();
+    res.json(quotes);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/quotes/daily', async (req, res) => {
+  try {
+    const quote = await getQuoteOfTheDay();
+    res.json(quote);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/meditations', authenticate, async (req, res) => {
+  try {
+    const { duration, type, notes } = req.body;
+
+    if (!duration) {
+      return res.status(400).json({ message: 'Duration is required' });
+    }
+
+    const session = await createMeditationSession(req.user.id, { duration, type, notes });
+    res.status(201).json({ message: 'Meditation session recorded', session });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/meditations', authenticate, async (req, res) => {
+  try {
+    const sessions = await getMeditationSessionsByUser(req.user.id);
+    res.json(sessions);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.delete('/api/meditations/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await deleteMeditationSession(req.user.id, id);
+
+    if (!deleted) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    res.json({ message: 'Session deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Community routes
+app.get('/api/community/posts', authenticate, async (req, res) => {
+  try {
+    const posts = await listCommunityPosts();
+
+    const postsWithComments = await Promise.all(
+      posts.map(async (post) => {
+        const comments = await getCommentsForPost(post.id);
+        return { ...post, comments };
+      })
+    );
+
+    res.json(postsWithComments);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/community/posts', authenticate, async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ message: 'Content is required' });
+    }
+
+    const post = await createCommunityPost(req.user.id, content.trim());
+    res.status(201).json({ ...post, comments: [] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/community/posts/:id/like', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const liked = await addLikeToPost(id);
+
+    if (!liked) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    res.json({ message: 'Post liked' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/community/posts/:id/comments', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ message: 'Content is required' });
+    }
+
+    const comment = await createCommunityComment(id, req.user.id, content.trim());
+    res.status(201).json(comment);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '..', 'frontend', 'build');
+  app.use(express.static(clientBuildPath));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 
 // Server startup
 app.listen(PORT, () => {
