@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/slowmind2/static/css/main.bb7b6bd5.css",
-    "main.js": "/slowmind2/static/js/main.57a26d0e.js",
+    "main.js": "/slowmind2/static/js/main.b85b179f.js",
     "index.html": "/slowmind2/index.html",
     "main.bb7b6bd5.css.map": "/slowmind2/static/css/main.bb7b6bd5.css.map",
-    "main.57a26d0e.js.map": "/slowmind2/static/js/main.57a26d0e.js.map"
+    "main.b85b179f.js.map": "/slowmind2/static/js/main.b85b179f.js.map"
   },
   "entrypoints": [
     "static/css/main.bb7b6bd5.css",
-    "static/js/main.57a26d0e.js"
+    "static/js/main.b85b179f.js"
   ]
 }
