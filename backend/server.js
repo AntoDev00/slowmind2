@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const { PORT, ALLOWED_ORIGINS } = require('./config');
@@ -32,11 +33,17 @@ app.get('/health', (req, res) => {
 
 if (process.env.NODE_ENV === 'production') {
   const clientBuildPath = path.join(__dirname, '..', 'frontend', 'build');
-  app.use(express.static(clientBuildPath));
-
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientBuildPath, 'index.html'));
-  });
+  const indexHtml = path.join(clientBuildPath, 'index.html');
+  if (fs.existsSync(indexHtml)) {
+    app.use(express.static(clientBuildPath));
+    app.get('*', (req, res) => {
+      res.sendFile(indexHtml);
+    });
+  } else {
+    app.get('/', (req, res) => {
+      res.json({ status: 'api' });
+    });
+  }
 }
 
 // Server startup
